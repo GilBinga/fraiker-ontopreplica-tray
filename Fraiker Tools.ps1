@@ -1,0 +1,193 @@
+﻿# Ajudante OnTopReplica: icone perto do relogio, abre/esconde/fecha as replicas.
+# Esconder = marcar a janela como "janela de ferramenta" (sai da barra e do Alt-Tab).
+# Layout das replicas: edite "Abrir réplicas.bat" nesta pasta.
+
+Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+
+Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+public static class OTR {
+    delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+    [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
+    [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
+    [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int c);
+
+    const int GWL_EXSTYLE = -20;
+    const int WS_EX_TOOLWINDOW = 0x80;
+    const int WS_EX_APPWINDOW = 0x40000;
+    const uint GW_OWNER = 4;
+    const int SW_HIDE = 0;
+    const int SW_SHOWNA = 8;
+
+    static List<IntPtr> Windows() {
+        var pids = new HashSet<uint>();
+        foreach (var p in Process.GetProcessesByName("OnTopReplica")) pids.Add((uint)p.Id);
+        var list = new List<IntPtr>();
+        EnumProc cb = (h, l) => {
+            uint pid;
+            GetWindowThreadProcessId(h, out pid);
+            if (pids.Contains(pid) && IsWindowVisible(h) && GetWindow(h, GW_OWNER) == IntPtr.Zero) list.Add(h);
+            return true;
+        };
+        EnumWindows(cb, IntPtr.Zero);
+        GC.KeepAlive(cb);
+        return list;
+    }
+
+    // hide=true: tira da barra e do Alt-Tab; hide=false: devolve. Retorna quantas mudou.
+    public static int Apply(bool hide) {
+        int n = 0;
+        foreach (var h in Windows()) {
+            int ex = GetWindowLong(h, GWL_EXSTYLE);
+            bool isTool = (ex & WS_EX_TOOLWINDOW) != 0;
+            if (hide == isTool) continue;
+            int nex = hide ? ((ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW) : (ex & ~WS_EX_TOOLWINDOW);
+            ShowWindow(h, SW_HIDE);
+            SetWindowLong(h, GWL_EXSTYLE, nex);
+            ShowWindow(h, SW_SHOWNA);
+            n++;
+        }
+        return n;
+    }
+}
+'@
+
+# Uma instancia so
+$mutex = New-Object System.Threading.Mutex($false, 'Local\OnTopReplicaTray')
+if (-not $mutex.WaitOne(0)) { exit }
+
+$dir = $PSScriptRoot
+$bat = Join-Path $dir 'Abrir réplicas.bat'
+# Acha o OnTopReplica.exe. Ordem: variavel OTR_EXE, processo aberto,
+# pasta do ajudante, pastas de instalacao comuns.
+function Find-OnTopReplica {
+    if ($env:OTR_EXE -and (Test-Path $env:OTR_EXE)) { return $env:OTR_EXE }
+    $p = Get-Process OnTopReplica -ErrorAction SilentlyContinue | Where-Object Path | Select-Object -First 1
+    if ($p) { return $p.Path }
+    $roots = @($dir, ${env:ProgramFiles(x86)}, $env:ProgramFiles, (Join-Path $env:LOCALAPPDATA 'Programs')) | Where-Object { $_ }
+    foreach ($r in $roots) {
+        $direct = Join-Path $r 'OnTopReplica.exe'
+        if (Test-Path $direct) { return $direct }
+        $folder = Join-Path $r 'OnTopReplica'
+        if (Test-Path $folder) {
+            $f = Get-ChildItem $folder -Filter OnTopReplica.exe -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($f) { return $f.FullName }
+        }
+    }
+    return $null
+}
+
+$exe = Find-OnTopReplica
+
+$tray = New-Object System.Windows.Forms.NotifyIcon
+$ico = Join-Path $dir 'assets\fraiker-tools.ico'
+if (Test-Path $ico) { $tray.Icon = New-Object System.Drawing.Icon($ico, [System.Windows.Forms.SystemInformation]::SmallIconSize) }
+elseif ($exe) { $tray.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe) }
+else { $tray.Icon = [System.Drawing.SystemIcons]::Application }
+$tray.Text = 'Fraiker Tools'
+
+function Show-Tip($msg) { $tray.ShowBalloonTip(2000, 'Fraiker Tools', $msg, [System.Windows.Forms.ToolTipIcon]::Info) }
+
+# Iniciar com o Windows = atalho "Fraiker Tools" na pasta Inicializar
+$launcher = Join-Path $dir 'Fraiker Tools.vbs'
+$startupLnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'Fraiker Tools.lnk'
+$desktopLnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Fraiker Tools.lnk'
+$programsLnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Fraiker Tools.lnk'
+$folderLnk = Join-Path $dir 'Fraiker Tools.lnk'
+
+# Atalho "Fraiker Tools" com o icone do escudo (o .vbs nao aceita icone proprio)
+function Set-Shortcut([string]$path, [bool]$on) {
+    if ($on) {
+        $sc = (New-Object -ComObject WScript.Shell).CreateShortcut($path)
+        $sc.TargetPath = Join-Path $env:WINDIR 'System32\wscript.exe'
+        $sc.Arguments = "`"$launcher`""
+        $sc.WorkingDirectory = $dir
+        $sc.Description = 'Fraiker Tools'
+        if (Test-Path $ico) { $sc.IconLocation = "$ico,0" }
+        $sc.Save()
+    } else {
+        Remove-Item $path -ErrorAction SilentlyContinue
+    }
+}
+# Sempre: atalho na pasta do ajudante e no Menu Iniciar (recriados, caso a pasta mude de lugar)
+try { Set-Shortcut $folderLnk $true; Set-Shortcut $programsLnk $true } catch {}
+# Opcionais: so atualizam se ja existirem
+foreach ($l in $startupLnk, $desktopLnk) { if (Test-Path $l) { try { Set-Shortcut $l $true } catch {} } }
+
+# Depois de abrir: por ~10 s, esconde as janelas que forem aparecendo
+$script:ticks = 0
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 500
+$timer.add_Tick({
+    [void][OTR]::Apply($true)
+    $script:ticks++
+    if ($script:ticks -ge 20) { $timer.Stop() }
+})
+
+function Open-Replicas {
+    if (-not (Test-Path $bat)) { Show-Tip 'Não achei "Abrir réplicas.bat" na pasta do ajudante.'; return }
+    if (-not $exe) { $script:exe = Find-OnTopReplica }
+    if (-not $exe) { Show-Tip 'Não achei o OnTopReplica.exe. Instale-o ou defina a variável OTR_EXE.'; return }
+    $env:OTR_EXE = $exe   # o .bat herda e usa este caminho
+    # Diretorio de trabalho fora da pasta do ajudante, para as replicas nao prenderem a pasta
+    Start-Process -FilePath $bat -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden
+    $script:ticks = 0
+    $timer.Start()
+}
+
+$menu = New-Object System.Windows.Forms.ContextMenuStrip
+function Add-Item($text, [scriptblock]$action) {
+    $item = $menu.Items.Add($text)
+    $item.add_Click($action)
+    return $item
+}
+
+$open = Add-Item 'Abrir / reabrir réplicas' { Open-Replicas }
+$open.Font = New-Object System.Drawing.Font($open.Font, [System.Drawing.FontStyle]::Bold)
+[void](Add-Item 'Esconder agora' { $n = [OTR]::Apply($true); Show-Tip "$n janela(s) escondida(s)." })
+[void](Add-Item 'Fechar todas' {
+    $timer.Stop()
+    Get-Process OnTopReplica -ErrorAction SilentlyContinue | Stop-Process -Force
+})
+[void](Add-Item 'Mostrar de novo na barra' { $timer.Stop(); $n = [OTR]::Apply($false); Show-Tip "$n janela(s) de volta na barra." })
+[void]$menu.Items.Add('-')
+[void](Add-Item 'Editar script de abrir' { Start-Process notepad.exe -ArgumentList "`"$bat`"" })
+$auto = Add-Item 'Iniciar com o Windows' {
+    Set-Shortcut $startupLnk (-not (Test-Path $startupLnk))
+    $auto.Checked = Test-Path $startupLnk
+}
+$auto.Checked = Test-Path $startupLnk
+$desk = Add-Item 'Atalho na Área de Trabalho' {
+    Set-Shortcut $desktopLnk (-not (Test-Path $desktopLnk))
+    $desk.Checked = Test-Path $desktopLnk
+}
+$desk.Checked = Test-Path $desktopLnk
+[void]$menu.Items.Add('-')
+$apoio = Add-Item 'Apoie o desenvolvedor: doe TCs para Fraiker' {
+    try { [System.Windows.Forms.Clipboard]::SetText('Fraiker') } catch {}
+    Show-Tip 'Nome "Fraiker" copiado. Para doar: Store do Tibia > Transfer Coins. Obrigado!'
+}
+$apoio.ForeColor = [System.Drawing.Color]::FromArgb(200, 130, 20)
+[void]$menu.Items.Add('-')
+[void](Add-Item 'Sair do ajudante' {
+    $timer.Stop()
+    $tray.Visible = $false
+    [System.Windows.Forms.Application]::Exit()
+})
+
+$tray.ContextMenuStrip = $menu
+$tray.add_DoubleClick({ Open-Replicas })
+$tray.Visible = $true
+
+[System.Windows.Forms.Application]::Run()
+
+$tray.Dispose()
+$mutex.ReleaseMutex()
