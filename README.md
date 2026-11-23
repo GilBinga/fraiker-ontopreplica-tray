@@ -56,7 +56,7 @@ Se mesmo assim nada aparecer: clique com o botão direito em `Fraiker Tools.ps1`
 **Jeito fácil:** use o [Gerador de .bat OnTopReplica para Tibia](https://claude.ai/artifact/6xc44YsEzGBxsgnZK54y6F).
 Você envia um print do jogo, marca as áreas que viram réplicas, posiciona cada uma e copia o `.bat` pronto.
 Ele também importa um `.bat` que você já tenha.
-Cole o resultado em `Abrir réplicas.bat`. Opcional: troque o caminho do `.exe` por `"%OTR_EXE%"` para usar o que o ajudante achou (útil se o OnTopReplica não estiver na pasta padrão).
+Cole o resultado em `Abrir réplicas.bat` e abra pelo menu **Abrir / reabrir réplicas**. O ajudante corrige sozinho o `%%OTR_EXE%%` que o gerador escreve (vira `%OTR_EXE%`) e usa o `.exe` que ele achou, mesmo fora da pasta padrão. Se rodar o `.bat` direto, sem o ajudante, troque `%%OTR_EXE%%` por `%OTR_EXE%` na mão.
 Créditos do gerador: [Porfz Tibia](https://www.youtube.com/@porfztibia).
 
 **Na mão:** edite `Abrir réplicas.bat` (pelo menu **Editar script de abrir**). Cada bloco `start` é uma réplica:

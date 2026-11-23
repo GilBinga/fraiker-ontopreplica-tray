@@ -137,6 +137,13 @@ function Open-Replicas {
     if (-not $exe) { $script:exe = Find-OnTopReplica }
     if (-not $exe) { Show-Tip 'Não achei o OnTopReplica.exe. Instale-o ou defina a variável OTR_EXE.'; return }
     $env:OTR_EXE = $exe   # o .bat herda e usa este caminho
+    # O gerador do site as vezes escreve %%OTR_EXE%% (escapado demais), que no .bat vira texto literal.
+    # Conserta o arquivo no disco antes de rodar.
+    try {
+        $txt = [IO.File]::ReadAllText($bat)
+        $fix = [regex]::Replace($txt, '%{2,}OTR_EXE%{2,}', '%OTR_EXE%')
+        if ($fix -ne $txt) { [IO.File]::WriteAllText($bat, $fix, (New-Object Text.UTF8Encoding($false))) }
+    } catch {}
     # Diretorio de trabalho fora da pasta do ajudante, para as replicas nao prenderem a pasta
     Start-Process -FilePath $bat -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden
     $script:ticks = 0
