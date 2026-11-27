@@ -166,6 +166,12 @@ $open.Font = New-Object System.Drawing.Font($open.Font, [System.Drawing.FontStyl
 })
 [void](Add-Item 'Mostrar de novo na barra' { $timer.Stop(); $n = [OTR]::Apply($false); Show-Tip "$n janela(s) de volta na barra." })
 [void]$menu.Items.Add('-')
+# Gerador de .bat feito pelo Porfz (creditos tambem no README)
+$layoutUrl = 'https://claude.ai/artifact/6xc44YsEzGBxsgnZK54y6F'
+[void](Add-Item 'Configurar layout (site do Porfz)' {
+    try { Start-Process $layoutUrl } catch {}
+    Show-Tip 'Monte o layout no site, copie o .bat e cole em "Editar script de abrir".'
+})
 [void](Add-Item 'Editar script de abrir' { Start-Process notepad.exe -ArgumentList "`"$bat`"" })
 $auto = Add-Item 'Iniciar com o Windows' {
     Set-Shortcut $startupLnk (-not (Test-Path $startupLnk))

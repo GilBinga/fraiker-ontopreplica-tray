@@ -30,6 +30,7 @@ Clique com o botão direito no ícone perto do relógio:
 | Esconder agora | Esconde as réplicas que você abriu por fora do ajudante |
 | Fechar todas | Fecha todas as réplicas |
 | Mostrar de novo na barra | Desfaz o esconder |
+| Configurar layout (site do Porfz) | Abre no navegador o gerador de `.bat` feito pelo [Porfz Tibia](https://www.youtube.com/@porfztibia) |
 | Editar script de abrir | Abre o `.bat` no Bloco de Notas |
 | Iniciar com o Windows | Liga ou desliga a abertura do ajudante junto com o Windows (com ✓ = ligado) |
 | Atalho na Área de Trabalho | Cria ou remove o atalho "Fraiker Tools" na Área de Trabalho |
@@ -53,7 +54,7 @@ Se mesmo assim nada aparecer: clique com o botão direito em `Fraiker Tools.ps1`
 
 ## Configurando suas réplicas
 
-**Jeito fácil:** use o [Gerador de .bat OnTopReplica para Tibia](https://claude.ai/artifact/6xc44YsEzGBxsgnZK54y6F).
+**Jeito fácil:** use o [Gerador de .bat OnTopReplica para Tibia](https://claude.ai/artifact/6xc44YsEzGBxsgnZK54y6F) (ou pelo menu **Configurar layout**).
 Você envia um print do jogo, marca as áreas que viram réplicas, posiciona cada uma e copia o `.bat` pronto.
 Ele também importa um `.bat` que você já tenha.
 Cole o resultado em `Abrir réplicas.bat` e abra pelo menu **Abrir / reabrir réplicas**. O ajudante corrige sozinho o `%%OTR_EXE%%` que o gerador escreve (vira `%OTR_EXE%`) e usa o `.exe` que ele achou, mesmo fora da pasta padrão. Se rodar o `.bat` direto, sem o ajudante, troque `%%OTR_EXE%%` por `%OTR_EXE%` na mão.
