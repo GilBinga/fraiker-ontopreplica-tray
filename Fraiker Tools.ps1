@@ -1,4 +1,5 @@
 ﻿# Ajudante OnTopReplica: icone perto do relogio, abre/esconde/fecha as replicas.
+# Duplo clique no icone alterna: abre se fechadas, fecha se abertas.
 # Esconder = marcar a janela como "janela de ferramenta" (sai da barra e do Alt-Tab).
 # Layout das replicas: edite "Abrir réplicas.bat" nesta pasta.
 
@@ -47,9 +48,10 @@ public static class OTR {
         int n = 0;
         foreach (var h in Windows()) {
             int ex = GetWindowLong(h, GWL_EXSTYLE);
-            bool isTool = (ex & WS_EX_TOOLWINDOW) != 0;
-            if (hide == isTool) continue;
+            // Compara com o estilo final: o OnTopReplica pode religar WS_EX_APPWINDOW, que
+            // mantem o botao na barra mesmo com WS_EX_TOOLWINDOW ligado.
             int nex = hide ? ((ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW) : (ex & ~WS_EX_TOOLWINDOW);
+            if (nex == ex) continue;
             ShowWindow(h, SW_HIDE);
             SetWindowLong(h, GWL_EXSTYLE, nex);
             ShowWindow(h, SW_SHOWNA);
@@ -150,6 +152,17 @@ function Open-Replicas {
     $timer.Start()
 }
 
+# Alterna: fecha se houver alguma replica rodando, abre se nao houver nenhuma
+function Switch-Replicas {
+    $running = Get-Process OnTopReplica -ErrorAction SilentlyContinue
+    if ($running) {
+        $timer.Stop()
+        $running | Stop-Process -Force
+    } else {
+        Open-Replicas
+    }
+}
+
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 function Add-Item($text, [scriptblock]$action) {
     $item = $menu.Items.Add($text)
@@ -157,14 +170,10 @@ function Add-Item($text, [scriptblock]$action) {
     return $item
 }
 
-$open = Add-Item 'Abrir / reabrir réplicas' { Open-Replicas }
+$open = Add-Item 'Abrir / fechar réplicas' { Switch-Replicas }
 $open.Font = New-Object System.Drawing.Font($open.Font, [System.Drawing.FontStyle]::Bold)
-[void](Add-Item 'Esconder agora' { $n = [OTR]::Apply($true); Show-Tip "$n janela(s) escondida(s)." })
-[void](Add-Item 'Fechar todas' {
-    $timer.Stop()
-    Get-Process OnTopReplica -ErrorAction SilentlyContinue | Stop-Process -Force
-})
-[void](Add-Item 'Mostrar de novo na barra' { $timer.Stop(); $n = [OTR]::Apply($false); Show-Tip "$n janela(s) de volta na barra." })
+[void](Add-Item 'Mostrar réplicas na barra' { $timer.Stop(); $n = [OTR]::Apply($false); Show-Tip "$n janela(s) de volta na barra." })
+[void](Add-Item 'Esconder réplicas da barra' { $n = [OTR]::Apply($true); Show-Tip "$n janela(s) escondida(s)." })
 [void]$menu.Items.Add('-')
 # Gerador de .bat feito pelo Porfz (creditos tambem no README)
 $layoutUrl = 'https://claude.ai/artifact/6xc44YsEzGBxsgnZK54y6F'
@@ -192,12 +201,13 @@ $apoio.ForeColor = [System.Drawing.Color]::FromArgb(200, 130, 20)
 [void]$menu.Items.Add('-')
 [void](Add-Item 'Sair do ajudante' {
     $timer.Stop()
+    Get-Process OnTopReplica -ErrorAction SilentlyContinue | Stop-Process -Force
     $tray.Visible = $false
     [System.Windows.Forms.Application]::Exit()
 })
 
 $tray.ContextMenuStrip = $menu
-$tray.add_DoubleClick({ Open-Replicas })
+$tray.add_DoubleClick({ Switch-Replicas })
 $tray.Visible = $true
 
 [System.Windows.Forms.Application]::Run()

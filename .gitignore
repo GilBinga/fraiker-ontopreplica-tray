@@ -1,3 +1,6 @@
 # atalhos gerados pelo ajudante (caminho absoluto de cada PC)
 *.lnk
 *.zip
+
+# zip da release (build-zip.ps1)
+dist/
