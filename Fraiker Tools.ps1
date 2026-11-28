@@ -134,6 +134,46 @@ $timer.add_Tick({
     if ($script:ticks -ge 20) { $timer.Stop() }
 })
 
+# Confere se o .bat so tem comandos de layout (rem, taskkill, timeout, start do OnTopReplica, exit).
+# Retorna as linhas fora do padrao. Nos valores das opcoes nao pode haver & | < > % ^, que
+# permitiriam esconder outro comando dentro de uma linha de aparencia normal.
+function Get-UnsafeLines([string]$text) {
+    $val = '("[^"&|<>%^]*"|[^\s"&|<>%^]+)'
+    $opt = "--[A-Za-z][A-Za-z0-9]*(=$val)?"
+    $exeArg = '"(%OTR_EXE%|[^"&|<>%^]*\\OnTopReplica\.exe)"'
+    $redir = '(\s+(>nul|2>nul|2>&1))*'
+    $ok = @(
+        '^@echo\s+off$'
+        '^rem(\s[^&|<>^]*)?$'
+        "^taskkill\s+/F\s+/IM\s+OnTopReplica\.exe$redir$"
+        "^timeout\s+/t\s+\d+(\s+/nobreak)?$redir$"
+        '^exit(\s+/b)?(\s+\d+)?$'
+        "^start\s+`"`"\s+$exeArg(\s+$opt)*$"
+    )
+    $bad = @()
+    $logical = @()
+    $cur = ''
+    foreach ($l in (($text -replace "`r", '') -split "`n")) {
+        if ($l -match '\^\s*$') {
+            # Continuacao (^ no fim) so vale para o start e as linhas de opcoes
+            if ($cur -eq '' -and $l.Trim() -notmatch '^start\s') { $bad += $l.Trim(); continue }
+            $cur += ($l -replace '\^\s*$', ' ')
+            continue
+        }
+        $logical += ($cur + $l)
+        $cur = ''
+    }
+    if ($cur) { $logical += $cur }
+    foreach ($l in $logical) {
+        $t = ($l -replace '\s+', ' ').Trim()
+        if ($t -eq '') { continue }
+        $match = $false
+        foreach ($re in $ok) { if ($t -match $re) { $match = $true; break } }
+        if (-not $match) { $bad += $t }
+    }
+    return $bad
+}
+
 function Open-Replicas {
     if (-not (Test-Path $bat)) { Show-Tip 'Não achei "Abrir réplicas.bat" na pasta do ajudante.'; return }
     if (-not $exe) { $script:exe = Find-OnTopReplica }
@@ -141,11 +181,18 @@ function Open-Replicas {
     $env:OTR_EXE = $exe   # o .bat herda e usa este caminho
     # O gerador do site as vezes escreve %%OTR_EXE%% (escapado demais), que no .bat vira texto literal.
     # Conserta o arquivo no disco antes de rodar.
-    try {
-        $txt = [IO.File]::ReadAllText($bat)
-        $fix = [regex]::Replace($txt, '%{2,}OTR_EXE%{2,}', '%OTR_EXE%')
-        if ($fix -ne $txt) { [IO.File]::WriteAllText($bat, $fix, (New-Object Text.UTF8Encoding($false))) }
-    } catch {}
+    try { $txt = [IO.File]::ReadAllText($bat) } catch { Show-Tip 'Não consegui ler o "Abrir réplicas.bat".'; return }
+    $fix = [regex]::Replace($txt, '%{2,}OTR_EXE%{2,}', '%OTR_EXE%')
+    if ($fix -ne $txt) { try { [IO.File]::WriteAllText($bat, $fix, (New-Object Text.UTF8Encoding($false))) } catch {} }
+    # Comandos fora do padrao de layout: pergunta antes de rodar (padrao: Nao)
+    $unsafe = @(Get-UnsafeLines $fix)
+    if ($unsafe.Count) {
+        $list = ($unsafe | Select-Object -First 5 | ForEach-Object { if ($_.Length -gt 90) { $_.Substring(0, 90) + '...' } else { $_ } }) -join "`n"
+        if ($unsafe.Count -gt 5) { $list += "`n(e mais $($unsafe.Count - 5))" }
+        $msg = "O ""Abrir réplicas.bat"" tem comandos fora do padrão de um layout:`n`n$list`n`nSó rode se você sabe o que esses comandos fazem.`nRodar mesmo assim?"
+        $r = [System.Windows.Forms.MessageBox]::Show($msg, 'Fraiker Tools', 'YesNo', 'Warning', 'Button2')
+        if ($r -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+    }
     # Diretorio de trabalho fora da pasta do ajudante, para as replicas nao prenderem a pasta
     Start-Process -FilePath $bat -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden
     $script:ticks = 0

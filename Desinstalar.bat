@@ -5,6 +5,14 @@ chcp 65001 >nul
 setlocal
 set "DIR=%~dp0"
 
+rem Trava: so roda na pasta do Fraiker Tools, para nao apagar arquivos de outra pasta
+if not exist "%DIR%Fraiker Tools.ps1" (
+  echo Este desinstalador precisa estar na pasta do Fraiker Tools, junto do "Fraiker Tools.ps1".
+  echo Nada foi apagado.
+  pause
+  exit /b
+)
+
 echo Fraiker Tools - desinstalação
 echo.
 echo Vai fechar o ajudante e as réplicas, apagar os atalhos "Fraiker Tools"

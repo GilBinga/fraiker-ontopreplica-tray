@@ -56,6 +56,11 @@ Ele também importa um `.bat` que você já tenha.
 Cole o resultado em `Abrir réplicas.bat` e abra pelo menu **Abrir / fechar réplicas** (se já estiverem abertas, use duas vezes: fecha e abre com o layout novo). O ajudante corrige sozinho o `%%OTR_EXE%%` que o gerador escreve (vira `%OTR_EXE%`) e usa o `.exe` que ele achou, mesmo fora da pasta padrão. Se rodar o `.bat` direto, sem o ajudante, troque `%%OTR_EXE%%` por `%OTR_EXE%` na mão.
 Créditos do gerador: [Porfz Tibia](https://www.youtube.com/@porfztibia).
 
+> [!WARNING]
+> O ajudante executa o `Abrir réplicas.bat` do jeito que ele estiver. Use só `.bat` feito pelo gerador ou por você, nunca um "layout pronto" mandado por desconhecidos.
+> Um layout normal só tem linhas `start "" "%OTR_EXE%" …` com opções `--…`, `taskkill /F /IM OnTopReplica.exe`, `timeout`, `rem`, `@echo off` e `exit`.
+> Se aparecer qualquer outra coisa, o ajudante mostra as linhas suspeitas e pergunta antes de rodar (o padrão é **Não**).
+
 **Na mão:** edite `Abrir réplicas.bat` (pelo menu **Editar script de abrir**). Cada bloco `start` é uma réplica:
 
 ```bat
